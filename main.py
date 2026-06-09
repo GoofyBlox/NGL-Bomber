@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import sys
 import time
@@ -28,28 +29,49 @@ def banner():
 ║    ██  ██ ██ ██   ██ ██      ██      ██    ██ ██    ██ ██  ██ ██            ║
 ║    ██   ████ ██   ██ ███████  ██████  ██████   ██████  ██   ████            ║
 ║                                                                               ║
-║                     NGL SPAM BOMBER v4.0 - TERMUX                            ║
+║                     NGL SPAM BOMBER v5.0 - WORKING                           ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 """ + RESET)
 
 def send_message(username, message):
     url = "https://ngl.link/api/submit"
+    
     headers = {
-        "User-Agent": random.choice([
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15"
-        ]),
-        "Accept": "application/json",
-        "Content-Type": "application/json"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Content-Type": "application/json",
+        "Origin": "https://ngl.link",
+        "Referer": f"https://ngl.link/{username}",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin"
     }
+    
     data = {
         "username": username,
         "question": message,
-        "deviceId": f"android-{random.randint(1000000, 9999999)}"
+        "deviceId": f"web-{random.randint(1000000, 9999999)}"
     }
+    
     try:
         r = requests.post(url, json=data, headers=headers, timeout=10)
-        return r.status_code == 200
+        if r.status_code == 200:
+            result = r.json()
+            if result.get("success") or result.get("status") == "success":
+                return True
+        return False
+    except Exception as e:
+        return False
+
+def test_connection(username):
+    """Test if username exists and API works"""
+    url = f"https://ngl.link/{username}"
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code == 200:
+            return True
+        return False
     except:
         return False
 
@@ -74,14 +96,14 @@ def save_log(log_entry):
             logs = json.load(f)
     logs.append(log_entry)
     with open("data/spam_logs.json", "w") as f:
-        json.dump(logs[-50:], f, indent=2)
+        json.dump(logs[-100:], f, indent=2)
 
 def view_logs():
     if os.path.exists("data/spam_logs.json"):
         with open("data/spam_logs.json", "r") as f:
             logs = json.load(f)
         if logs:
-            for log in reversed(logs[-15:]):
+            for log in reversed(logs[-20:]):
                 print(f"[{log['timestamp']}] @{log['username']} - ✅ {log['sent']} | ❌ {log['failed']}")
         else:
             print("[-] No logs")
@@ -109,6 +131,15 @@ def main():
             banner()
             username = input("\n[?] NGL Username: ")
             
+            # Test if username exists
+            print(YELLOW + "\n[!] Testing connection..." + RESET)
+            if not test_connection(username):
+                print(RED + "[-] Username not found or NGL is down!" + RESET)
+                input("\nPress Enter...")
+                continue
+            
+            print(GREEN + "[+] Username found!" + RESET)
+            
             messages = load_messages()
             if not messages:
                 print(YELLOW + "\n[!] No saved messages. Add some first." + RESET)
@@ -122,7 +153,7 @@ def main():
                 save_messages(messages)
             
             count = int(input("\n[?] Number of messages to send: "))
-            delay = float(input("[?] Delay between messages (seconds): "))
+            delay = float(input("[?] Delay between messages (seconds, 0.5-3): "))
             
             print(GREEN + f"\n[+] Spamming @{username}..." + RESET)
             print(YELLOW + "[+] Press Ctrl+C to stop\n" + RESET)
@@ -136,15 +167,16 @@ def main():
                     msg = random.choice(messages)
                     if send_message(username, msg):
                         sent += 1
+                        print(f"\r✅ Sent: {sent} | ❌ Failed: {failed} | 💬 {msg[:30]}...", end="")
                     else:
                         failed += 1
-                    elapsed = int(time.time() - start)
-                    print(f"\r✅ Sent: {sent} | ❌ Failed: {failed} | ⏱️ {elapsed}s", end="")
+                        print(f"\r✅ Sent: {sent} | ❌ Failed: {failed} | 💬 FAILED", end="")
                     time.sleep(delay)
             except KeyboardInterrupt:
                 print(YELLOW + "\n\n[!] Stopped" + RESET)
             
-            print(f"\n\n{GREEN}[+] Complete! Sent: {sent} | Failed: {failed}" + RESET)
+            elapsed = int(time.time() - start)
+            print(f"\n\n{GREEN}[+] Complete! Sent: {sent} | Failed: {failed} | Time: {elapsed}s" + RESET)
             
             save_log({
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
