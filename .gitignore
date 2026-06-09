@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+data/saved_messages.txt
+data/spam_logs.json
